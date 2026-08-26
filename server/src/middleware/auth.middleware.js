@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken')
 
-const jwtSecret = process.env.JWT_SECRET;
+const jwtSecret = process.env.JWT_SECRET || 'mySecretKey'
 
 function tokenVerify(req, res, next) {
     const authorization = req.get('Authorization')
@@ -11,18 +11,12 @@ function tokenVerify(req, res, next) {
         })
     }
 
-    const token = authorization.split(' ')[1]
+    const token = authorization.slice(7).trim()
 
     try {
         const decoded = jwt.verify(token, jwtSecret)
 
         req.user = decoded
-
-        if (decoded.role !== 'Admin' && decoded.role !== 'Owner') {
-            return res.status(403).json({
-                message: 'Access denied'
-            })
-        }
 
         next()
 
@@ -33,4 +27,16 @@ function tokenVerify(req, res, next) {
     }
 }
 
-module.exports = { tokenVerify }
+function authorizeRoles(...allowedRoles) {
+    return (req, res, next) => {
+        if (!req.user || !allowedRoles.includes(req.user.role)) {
+            return res.status(403).json({
+                message: 'Access denied'
+            })
+        }
+
+        next()
+    }
+}
+
+module.exports = { tokenVerify, authorizeRoles }

@@ -6,7 +6,10 @@ dotenv.config()
 const app = express()
 
 const { signup, login } = require('./src/controllers/auth.controller')
-const tokenVerify  = require('./src/middleware/auth.middleware')
+const { tokenVerify } = require('./src/middleware/auth.middleware');
+const { profile } = require('./src/controllers/profile.controller')
+
+const { router } = require('./src/routes/hostel_routes')
 
 app.use(cors())
 app.use(express.json())
@@ -17,6 +20,11 @@ mongoose.connect(process.env.Database_URL)
 
 app.post('/signup', signup)
 app.post('/login', login)
+
+app.get('/profile', tokenVerify, profile)
+
+app.use(router)
+
 
 app.listen(3000, () => {
     console.log('the app is running on 3000 port')

@@ -41,13 +41,13 @@ const HostelSchema = mongoose.Schema({
             enum: ['Point'],
             default: 'Point'
         },
-        coordinates: {
-            type: [Number],
-            validate: {
-                validator: coordinates => coordinates.length === 2,
-                message: 'Location coordinates must contain longitude and latitude'
-            }
-        }
+        // coordinates: {
+        //     type: [Number],
+        //     validate: {
+        //         validator: coordinates => coordinates.length === 2,
+        //         message: 'Location coordinates must contain longitude and latitude'
+        //     }
+        // }
     },
     amenities: [String],
     images: [String],
