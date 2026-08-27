@@ -16,7 +16,7 @@ async function hostel(req, res){
     })
 
     return res.status(201).json({
-        message: 'hostel inserted succesfull',
+        message: 'Hostel Created succesfull',
         Hostel : {id: hostel._id, name:hostel.name, description:hostel.description, gender:hostel.gender,
             address:hostel.address, city:hostel.city, locality:hostel.locality, amenities:hostel.amenities, status:hostel.status
             }
@@ -29,4 +29,21 @@ async function hostel(req, res){
     }
 }
 
-module.exports = { hostel }
+
+
+async function getHostel(req, res){
+    try{
+        const hostels = await Hostel.find({ status: 'approved' })
+        return res.status(200).json({
+            message: 'Hostels fetched successfully',
+            data: {
+                hostels
+            }
+        })
+    }catch(err){
+        return res.status(500).json({ message: 'Unable to fetch hostels' })
+    }
+}
+
+
+module.exports = { hostel, getHostel }

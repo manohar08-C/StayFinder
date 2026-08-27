@@ -31,7 +31,7 @@ async function login(req, res) {
 
         const isMatch = await bcrypt.compare(req.body.password, user.password)
         if (!isMatch) {
-            return res.status(401).json({ message: 'Invalid email or password' })
+            return res.status(401).json({ message: 'Invalid password' })
         }
 
         const token = jwt.sign(
