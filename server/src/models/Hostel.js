@@ -58,7 +58,7 @@ const HostelSchema = mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['draft', 'pending', 'approved', 'rejected', 'inactive'],
+        enum: ['pending', 'approved', 'rejected', 'inactive'],
         default: 'pending'
     },
     rating: {

@@ -31,7 +31,7 @@ async function hostel(req, res){
 
 
 
-async function getHostel(req, res){
+async function getHostels(req, res){
     try{
         const hostels = await Hostel.find({ status: 'approved' })
         return res.status(200).json({
@@ -45,5 +45,118 @@ async function getHostel(req, res){
     }
 }
 
+async function getHostelById(req, res){
+    try{
+        const hostel = await Hostel.findOne({
+            _id: req.params.id,
+            status: 'approved'
+        })
 
-module.exports = { hostel, getHostel }
+        if (!hostel) {
+            return res.status(404).json({ message: 'Hostel not found' })
+        }
+
+        return res.status(200).json({
+            message: 'Hostel fetched successfully',
+            data:{
+                hostel
+            }
+        })
+    }catch(err) {
+        return res.status(400).json({ message: 'Unable to fetch hostel' })
+    }
+}
+
+
+async function getMyHostels(req, res){
+    try{
+    const hostels = await Hostel.find({ owner: req.user.id })
+
+    return res.status(200).json({
+        message: 'Hostels fetched successfully',
+        data:{
+            hostels
+        }
+    })
+    }catch(err){
+        return res.status(404).json({ message: 'Unable to fetch hostel' })
+    }
+}
+
+
+async function updateHostel(req, res){
+    try{
+        const {
+            name,
+            description,
+            gender,
+            address,
+            city,
+            locality,
+            amenities
+        } = req.body;
+
+        const updateData = {
+            name,
+            description,
+            gender,
+            address,
+            city,
+            locality,
+            amenities
+        };
+
+        const hostel = await Hostel.findOneAndUpdate(
+            {
+                _id: req.params.id,
+                owner: req.user.id
+            },
+            updateData,
+            {
+                returnDocument: 'after',
+                runValidators: true
+            }
+        );
+
+        if (!hostel){
+            return res.status(404).json({ message: 'Hostel not found' })
+        }
+
+        return res.status(200).json({
+            message: 'Hostel updated successfully',
+            data:{
+                hostel
+            }
+        })
+    }catch(err){
+        return res.status(400).json({ message: err.message })
+    }
+}
+
+
+async function deleteHostel(req, res){
+    try{
+        const hostel = await Hostel.findOneAndDelete(
+            {
+                _id: req.params.id,
+                owner: req.user.id
+            }
+        )
+
+        if (!hostel){
+            return res.status(404).json({ message: 'Hostel not found' })
+        }
+
+        return res.status(200).json({
+            message: 'Hostel Deleted successfully',
+            data:{
+                hostel
+            }
+        })
+    }catch(err){
+        return res.status(400).json({ message: err.message })
+    
+    }
+}
+
+module.exports = { hostel, getHostels, getHostelById, getMyHostels, updateHostel, deleteHostel }

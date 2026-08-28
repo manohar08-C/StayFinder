@@ -5,7 +5,7 @@ const jwtSecret = process.env.JWT_SECRET || 'mySecretKey'
 function tokenVerify(req, res, next) {
     const authorization = req.get('Authorization')
 
-    if (!authorization || !authorization.startsWith('Bearer ')) {
+    if (!authorization || !authorization.startsWith('Bearer')) {
         return res.status(401).json({
             message: 'Token required'
         })

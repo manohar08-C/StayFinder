@@ -10,6 +10,7 @@ const { tokenVerify } = require('./src/middleware/auth.middleware');
 const { profile } = require('./src/controllers/profile.controller')
 
 const { router } = require('./src/routes/hostel_routes')
+const { AdminRouter } = require('./src/routes/admin.routes')
 
 app.use(cors())
 app.use(express.json())
@@ -24,6 +25,7 @@ app.post('/login', login)
 app.get('/profile', tokenVerify, profile)
 
 app.use(router)
+app.use(AdminRouter)
 
 
 app.listen(3000, () => {
