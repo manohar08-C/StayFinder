@@ -24,7 +24,13 @@ const RoomSchema = mongoose.Schema({
     availableBeds: {
         type: Number,
         required: true,
-        min: 0
+        min: 0,
+        validate: {
+            validator: function (value) {
+                return value <= this.capacity
+            },
+            message: 'availableBeds cannot be more than capacity'
+        }
     },
     area: {
         type: Number,

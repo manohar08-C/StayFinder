@@ -1,9 +1,12 @@
 const Hostel = require('../models/Hostel')
+const Room = require('../models/Room')
+const { hostelSearchServices } = require('../services/hostelSearch.services')
+const { searchHostelsNearby } = require('../services/geoHostelSearch.services')
 
 async function hostel(req, res){
     try
     {
-    const { name, description, gender, address, city, locality, amenities } = req.body
+    const { name, description, gender, address, city, locality, amenities, location } = req.body
     const hostel = await Hostel.create({
         owner: req.user.id,
         name,
@@ -12,7 +15,8 @@ async function hostel(req, res){
         address,
         city,
         locality,
-        amenities
+        amenities,
+        location
     })
 
     return res.status(201).json({
@@ -30,18 +34,37 @@ async function hostel(req, res){
 }
 
 
-
 async function getHostels(req, res){
-    try{
-        const hostels = await Hostel.find({ status: 'approved' })
+    try {
+        const result = await hostelSearchServices(req.query)
+
         return res.status(200).json({
             message: 'Hostels fetched successfully',
+            data:{ 
+                hostels: result.hostels 
+            },
+            pagination: result.pagination
+        })
+    } catch (err) {
+        return res.status(500).json({ message: 'Unable to fetch hostels' })
+    }
+}
+
+
+async function getNearbyHostels(req, res) {
+    try {
+        const hostels = await searchHostelsNearby(req.query)
+
+        return res.status(200).json({
+            message: 'Nearby hostels fetched successfully',
             data: {
                 hostels
             }
         })
-    }catch(err){
-        return res.status(500).json({ message: 'Unable to fetch hostels' })
+    } catch (err) {
+        return res.status(400).json({
+            message: err.message || 'Unable to fetch nearby hostels'
+        })
     }
 }
 
@@ -93,7 +116,8 @@ async function updateHostel(req, res){
             address,
             city,
             locality,
-            amenities
+            amenities,
+            location
         } = req.body;
 
         const updateData = {
@@ -103,7 +127,8 @@ async function updateHostel(req, res){
             address,
             city,
             locality,
-            amenities
+            amenities,
+            location
         };
 
         const hostel = await Hostel.findOneAndUpdate(
@@ -159,4 +184,5 @@ async function deleteHostel(req, res){
     }
 }
 
-module.exports = { hostel, getHostels, getHostelById, getMyHostels, updateHostel, deleteHostel }
+
+module.exports = { hostel, getHostels, getHostelById, getMyHostels, updateHostel, deleteHostel, getNearbyHostels }

@@ -11,6 +11,7 @@ const { profile } = require('./src/controllers/profile.controller')
 
 const { router } = require('./src/routes/hostel_routes')
 const { AdminRouter } = require('./src/routes/admin.routes')
+const { RoomRouter } = require('./src/routes/room.routes')
 
 app.use(cors())
 app.use(express.json())
@@ -26,6 +27,7 @@ app.get('/profile', tokenVerify, profile)
 
 app.use(router)
 app.use(AdminRouter)
+app.use(RoomRouter)
 
 
 app.listen(3000, () => {

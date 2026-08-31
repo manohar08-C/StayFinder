@@ -41,13 +41,13 @@ const HostelSchema = mongoose.Schema({
             enum: ['Point'],
             default: 'Point'
         },
-        // coordinates: {
-        //     type: [Number],
-        //     validate: {
-        //         validator: coordinates => coordinates.length === 2,
-        //         message: 'Location coordinates must contain longitude and latitude'
-        //     }
-        // }
+        coordinates: {
+            type: [Number],
+            validate: {
+                validator: coordinates => coordinates.length === 2,
+                message: 'Location coordinates must contain longitude and latitude'
+            }
+        }
     },
     amenities: [String],
     images: [String],
@@ -69,6 +69,7 @@ const HostelSchema = mongoose.Schema({
     }
 }, { timestamps: true })
 
+HostelSchema.index({ location: '2dsphere' })
 const Hostel = mongoose.model('Hostel', HostelSchema);
 
 module.exports = Hostel;
