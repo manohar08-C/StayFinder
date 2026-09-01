@@ -1,7 +1,7 @@
 const Hostel = require('../models/Hostel')
 const Room = require('../models/Room')
 const { hostelSearchServices } = require('../services/hostelSearch.services')
-const { searchHostelsNearby } = require('../services/geoHostelSearch.services')
+// const { searchHostelsNearby } = require('../services/geoHostelSearch.services')
 
 async function hostel(req, res){
     try
@@ -51,22 +51,22 @@ async function getHostels(req, res){
 }
 
 
-async function getNearbyHostels(req, res) {
-    try {
-        const hostels = await searchHostelsNearby(req.query)
+// async function getNearbyHostels(req, res) {
+//     try {
+//         const hostels = await searchHostelsNearby(req.query)
 
-        return res.status(200).json({
-            message: 'Nearby hostels fetched successfully',
-            data: {
-                hostels
-            }
-        })
-    } catch (err) {
-        return res.status(400).json({
-            message: err.message || 'Unable to fetch nearby hostels'
-        })
-    }
-}
+//         return res.status(200).json({
+//             message: 'Nearby hostels fetched successfully',
+//             data: {
+//                 hostels
+//             }
+//         })
+//     } catch (err) {
+//         return res.status(400).json({
+//             message: err.message || 'Unable to fetch nearby hostels'
+//         })
+//     }
+// }
 
 async function getHostelById(req, res){
     try{
@@ -185,4 +185,4 @@ async function deleteHostel(req, res){
 }
 
 
-module.exports = { hostel, getHostels, getHostelById, getMyHostels, updateHostel, deleteHostel, getNearbyHostels }
+module.exports = { hostel, getHostels, getHostelById, getMyHostels, updateHostel, deleteHostel }

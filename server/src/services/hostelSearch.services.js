@@ -3,6 +3,26 @@ const Room = require('../models/Room')
 
 const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
+function normalizeGeoQuery(query = {}) {
+    const lat = Number(query.lat)
+    const lng = Number(query.lng)
+    const radius = Number(query.radius)
+
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+        throw new Error('A valid latitude between -90 and 90 is required.')
+    }
+
+    if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
+        throw new Error('A valid longitude between -180 and 180 is required.')
+    }
+
+    if (!Number.isFinite(radius) || radius <= 0) {
+        throw new Error('A valid radius in meters greater than 0 is required.')
+    }
+
+    return { lat, lng, radius }
+}
+
 async function hostelSearchServices(query) {
     const {
         city,
@@ -17,68 +37,25 @@ async function hostelSearchServices(query) {
         availableBeds,
         page,
         limit,
-        sort
+        sort,
+        lat,
+        lng,
+        radius
     } = query
 
     const pageNumber = Math.max(1, Number(page) || 1)
     const limitNumber = Math.max(1, Number(limit) || 10)
     const skip = (pageNumber - 1) * limitNumber
+    const hasGeoSearch = lat !== undefined && lng !== undefined && radius !== undefined
 
     if (sort === 'price_asc' || sort === 'price_desc') {
-        return searchHostelsByPrice({ ...query, page: pageNumber, limit: limitNumber, skip })
-    }
-
-    const filters = { status: 'approved' }
-
-    if (city) filters.city = new RegExp(`^${escapeRegex(city)}$`, 'i')
-    if (locality) filters.locality = new RegExp(`^${escapeRegex(locality)}$`, 'i')
-    if (gender) filters.gender = gender
-
-    if (amenities) {
-        const amenityList = Array.isArray(amenities)
-            ? amenities
-            : String(amenities).split(',')
-
-        const cleanedAmenities = amenityList
-            .map(item => String(item).trim())
-            .filter(Boolean)
-
-        if (cleanedAmenities.length) {
-            filters.amenities = { $all: cleanedAmenities }
+        if (!hasGeoSearch) {
+            return searchHostelsByPrice({ ...query, page: pageNumber, limit: limitNumber, skip })
         }
     }
 
-    if (rating) {
-        const parsedRating = Number(rating)
-        if (!Number.isNaN(parsedRating)) {
-            filters.rating = { $gte: parsedRating }
-        }
-    }
-
-    const roomFilter = {}
-
-    if (minPrice || maxPrice) {
-        roomFilter.price = {}
-        if (minPrice) roomFilter.price.$gte = Number(minPrice)
-        if (maxPrice) roomFilter.price.$lte = Number(maxPrice)
-    }
-
-    if (roomType) roomFilter.roomType = roomType
-
-    if (capacity) {
-        const parsedCapacity = Number(capacity)
-        if (!Number.isNaN(parsedCapacity)) {
-            roomFilter.capacity = { $gte: parsedCapacity }
-        }
-    }
-
-    if (availableBeds) {
-        const parsedAvailableBeds = Number(availableBeds)
-        if (!Number.isNaN(parsedAvailableBeds)) {
-            roomFilter.availableBeds = { $gte: parsedAvailableBeds }
-        }
-    }
-
+    const filters = buildHostelMatch(query)
+    const roomFilter = buildRoomMatch(query)
     const hasRoomFilters = Object.keys(roomFilter).length > 0
 
     if (hasRoomFilters) {
@@ -99,6 +76,53 @@ async function hostelSearchServices(query) {
         }
 
         filters._id = { $in: hostelIds }
+    }
+
+    if (hasGeoSearch) {
+        const geoQuery = normalizeGeoQuery({ lat, lng, radius })
+        const geoPipeline = buildUnifiedSearchPipeline({
+            hostelMatch: filters,
+            roomMatch: roomFilter,
+            geo: geoQuery,
+            sort,
+            skip,
+            limit: limitNumber
+        })
+
+        const totalPipeline = buildUnifiedSearchCountPipeline({
+            hostelMatch: filters,
+            roomMatch: roomFilter,
+            geo: geoQuery
+        })
+
+        const [hostels, totalResult] = await Promise.all([
+            Hostel.aggregate(geoPipeline),
+            Hostel.aggregate(totalPipeline)
+        ])
+
+        const total = totalResult[0]?.total || 0
+        const totalPages = Math.ceil(total / limitNumber)
+
+        const hostelsWithPrice = hostels.map(hostel => ({
+            ...hostel,
+            distance: typeof hostel.distance === 'number'
+                ? Number(hostel.distance.toFixed(2))
+                : hostel.distance != null
+                    ? Number(Number(hostel.distance).toFixed(2))
+                    : null,
+            startingPrice: hostel.startingPrice ?? null
+        }))
+
+        return {
+            hostels: hostelsWithPrice,
+            pagination: {
+                total,
+                page: pageNumber,
+                limit: limitNumber,
+                pages: totalPages,
+                skip
+            }
+        }
     }
 
     const total = await Hostel.countDocuments(filters)
@@ -175,6 +199,106 @@ function buildHostelMatch(query) {
     }
 
     return hostelMatch
+}
+
+function buildUnifiedSortStage({ sort, geo }) {
+    if (sort === 'price_asc') return { startingPrice: 1 }
+    if (sort === 'price_desc') return { startingPrice: -1 }
+    if (sort === 'rating_desc') return { rating: -1, createdAt: -1 }
+    if (sort === 'newest') return { createdAt: -1 }
+    if (sort === 'distance' || geo) return { distance: 1 }
+    return { createdAt: -1 }
+}
+
+function buildUnifiedSearchPipeline({ hostelMatch, roomMatch = {}, geo, sort, skip, limit }) {
+    const pipeline = []
+
+    if (geo) {
+        pipeline.push({
+            $geoNear: {
+                near: {
+                    type: 'Point',
+                    coordinates: [geo.lng, geo.lat]
+                },
+                distanceField: 'distance',
+                maxDistance: geo.radius,
+                query: hostelMatch,
+                spherical: true,
+                distanceMultiplier: 0.001
+            }
+        })
+    } else {
+        pipeline.push({ $match: hostelMatch })
+    }
+
+    const roomLookupPipeline = [{ $match: { $expr: { $eq: ['$hostel', '$$hostelId'] } } }]
+
+    if (Object.keys(roomMatch).length > 0) {
+        roomLookupPipeline.push({ $match: roomMatch })
+    }
+
+    pipeline.push({
+        $lookup: {
+            from: 'rooms',
+            let: { hostelId: '$_id' },
+            pipeline: roomLookupPipeline,
+            as: 'rooms'
+        }
+    })
+
+    pipeline.push({
+        $addFields: {
+            startingPrice: {
+                $ifNull: [
+                    { $min: '$rooms.price' },
+                    null
+                ]
+            },
+            distance: {
+                $ifNull: ['$distance', null]
+            }
+        }
+    })
+
+    const shouldFilterByRoomMatch = Object.keys(roomMatch).length > 0 || sort === 'price_asc' || sort === 'price_desc'
+
+    if (shouldFilterByRoomMatch) {
+        pipeline.push({
+            $match: {
+                startingPrice: { $ne: null }
+            }
+        })
+    }
+
+    const sortStage = buildUnifiedSortStage({ sort, geo })
+    if (sortStage) {
+        pipeline.push({ $sort: sortStage })
+    }
+
+    if (Number.isInteger(skip) && skip > 0) {
+        pipeline.push({ $skip: skip })
+    }
+
+    if (Number.isInteger(limit) && limit > 0) {
+        pipeline.push({ $limit: limit })
+    }
+
+    return pipeline
+}
+
+function buildUnifiedSearchCountPipeline({ hostelMatch, roomMatch = {}, geo }) {
+    const pipeline = buildUnifiedSearchPipeline({
+        hostelMatch,
+        roomMatch,
+        geo,
+        sort: 'newest',
+        skip: 0,
+        limit: 0
+    })
+
+    pipeline.push({ $count: 'total' })
+
+    return pipeline
 }
 
 function buildRoomMatch(query) {
