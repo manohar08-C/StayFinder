@@ -11,26 +11,28 @@ const RoomSchema = mongoose.Schema({
         required: true,
         trim: true
     },
-    price: {
-        type: Number,
-        required: true,
-        min: 0
+    pricing: {
+        daily: {
+            type: Number,
+            required: true,
+            min: 0
+        },
+        monthly: {
+            type: Number,
+            required: true,
+            min: 0
+        }
     },
     capacity: {
         type: Number,
         required: true,
         min: 1
     },
-    availableBeds: {
+    availabilityVersion: {
         type: Number,
         required: true,
         min: 0,
-        validate: {
-            validator: function (value) {
-                return value <= this.capacity
-            },
-            message: 'availableBeds cannot be more than capacity'
-        }
+        default: 0
     },
     area: {
         type: Number,

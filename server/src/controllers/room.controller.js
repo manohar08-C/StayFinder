@@ -1,9 +1,10 @@
 const Hostel = require('../models/Hostel')
 const Room = require('../models/Room')
+const Booking = require('../models/Booking')
 
 async function createRoom(req, res) {
     try {
-        const { roomType, price, capacity, availableBeds, area, amenities, images } = req.body
+        const { roomType, pricing, capacity, area, amenities, images } = req.body
 
         const hostel = await Hostel.findOne({
             _id: req.params.id,
@@ -17,9 +18,8 @@ async function createRoom(req, res) {
         const room = await Room.create({
             hostel: hostel._id,
             roomType,
-            price,
+            pricing,
             capacity,
-            availableBeds,
             area,
             amenities,
             images
@@ -93,8 +93,28 @@ async function getRoomById(req, res) {
 
 async function updateRoom(req, res){
     try{
-        const { roomType, price, capacity, availableBeds, area, amenities, images } = req.body
-        const updatedData = { roomType, price, capacity, availableBeds, area, amenities, images }
+        const { roomType, pricing, capacity, area, amenities, images } = req.body
+
+        if (
+            pricing !== undefined &&
+            (
+                pricing.daily === undefined ||
+                pricing.monthly === undefined
+            )
+        ) {
+            return res.status(400).json({
+                message: 'Daily and monthly pricing are required when updating pricing'
+            })
+        }
+
+        const updatedData = {
+            roomType,
+            pricing,
+            capacity,
+            area,
+            amenities,
+            images
+        }
 
         const room = await Room.findById(req.params.id)
 
@@ -109,6 +129,30 @@ async function updateRoom(req, res){
 
         if(!hostel){
             return res.status(403).json({message: "You are not authorized to update this room"})
+        }
+
+        if (capacity !== undefined) {
+            const bookedBedsResult = await Booking.aggregate([
+                {
+                    $match: {
+                        room: room._id,
+                        status: { $ne: 'cancelled' }
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        bookedBeds: { $sum: { $ifNull: ['$numberOfBeds', 1] } }
+                    }
+                }
+            ])
+
+            const bookedBeds = bookedBedsResult[0]?.bookedBeds || 0
+            if (Number(capacity) < bookedBeds) {
+                return res.status(400).json({
+                    message: `Capacity cannot be less than currently booked beds (${bookedBeds})`
+                })
+            }
         }
 
         const updatedRoom = await Room.findByIdAndUpdate(
@@ -146,6 +190,17 @@ async function deleteRoom(req, res){
 
         if(!hostel){
             return res.status(403).json({message: "You are not authorized to delete this room"})
+        }
+
+        const activeBooking = await Booking.findOne({
+            room: room._id,
+            status: { $ne: 'cancelled' }
+        }).select('_id')
+
+        if (activeBooking) {
+            return res.status(400).json({
+                message: 'Cannot delete a room with active bookings'
+            })
         }
 
         const deletedRoom = await Room.findByIdAndDelete(
