@@ -13,6 +13,8 @@ const { router } = require('./src/routes/hostel_routes')
 const { AdminRouter } = require('./src/routes/admin.routes')
 const { RoomRouter } = require('./src/routes/room.routes')
 const { BookingRoute } = require('./src/routes/booking.routes')
+const { ReviewRoute } = require('./src/routes/review.routes')
+const { FavoriteRouter } = require('./src/routes/favorite.routes')
 
 app.use(cors())
 app.use(express.json())
@@ -30,6 +32,8 @@ app.use(router)
 app.use(AdminRouter)
 app.use(RoomRouter)
 app.use(BookingRoute)
+app.use(ReviewRoute)
+app.use(FavoriteRouter)
 
 
 app.listen(3000, () => {

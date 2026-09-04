@@ -3,6 +3,16 @@ const Booking = require('../models/Booking')
 const Hostel = require('../models/Hostel')
 const Room = require('../models/Room')
 
+function isValidObjectId(value) {
+    return mongoose.Types.ObjectId.isValid(value)
+}
+
+function createError(message, statusCode) {
+    const error = new Error(message)
+    error.statusCode = statusCode
+    return error
+}
+
 async function createBooking(req, res) {
     const {
         hostel: hostelId,
@@ -17,6 +27,10 @@ async function createBooking(req, res) {
         return res.status(400).json({
             message: 'Hostel, room, check-in, check-out and pricing type are required'
         })
+    }
+
+    if (!isValidObjectId(hostelId) || !isValidObjectId(roomId)) {
+        return res.status(400).json({ message: 'Invalid hostel or room ID' })
     }
 
     const requestedBeds = Number(numberOfBeds)
@@ -83,14 +97,11 @@ async function createBooking(req, res) {
                 throw error
             }
 
-            const pricingConfig = room.pricing
+            const pricingConfig = room.pricing || {}
+            const pricePerUnit = Number(pricingConfig[pricingType])
 
-            const pricePerUnit = pricingConfig[pricingType]
-
-            if (pricePerUnit === undefined || Number(pricePerUnit) < 0) {
-                const error = new Error(`Room does not have a valid ${pricingType} price`) 
-                error.statusCode = 400
-                throw error
+            if (!Number.isFinite(pricePerUnit) || pricePerUnit < 0) {
+                throw createError(`Room does not have a valid ${pricingType} price`, 400)
             }
 
             const millisecondsPerDay = 1000 * 60 * 60 * 24
@@ -112,9 +123,7 @@ async function createBooking(req, res) {
 
             const roomCapacity = Number(room.capacity)
             if (requestedBeds > roomCapacity) {
-                const error = new Error('Requested beds cannot exceed room capacity')
-                error.statusCode = 400
-                throw error
+                throw createError('Requested beds cannot exceed room capacity', 400)
             }
 
             const overlappingBookings = await Booking.find({
@@ -129,9 +138,7 @@ async function createBooking(req, res) {
             }, 0)
 
             if ((bookedBeds + requestedBeds) > roomCapacity) {
-                const error = new Error('No beds available for the selected dates')
-                error.statusCode = 409
-                throw error
+                throw createError('No beds available for the selected dates', 409)
             }
 
             const [createdBooking] = await Booking.create([
@@ -188,6 +195,10 @@ async function getMyBookings(req, res){
 }
 
 async function getBookingById(req, res) {
+    if (!isValidObjectId(req.params.id)) {
+        return res.status(400).json({ message: 'Invalid booking ID' })
+    }
+
     try {
         const booking = await Booking.findOne({
             _id: req.params.id,
@@ -246,33 +257,31 @@ async function getOwnerPendingBookings(req, res) {
 
 async function confirmBooking(req, res) {
     try {
-        const booking = await Booking.findById(req.params.id)
+        if (!isValidObjectId(req.params.id)) {
+            return res.status(400).json({ message: 'Invalid booking ID' })
+        }
+
+        const ownerHostels = await Hostel.find({ owner: req.user.id }).select('_id')
+        const booking = await Booking.findOneAndUpdate(
+            {
+                _id: req.params.id,
+                hostel: { $in: ownerHostels.map(hostel => hostel._id) },
+                status: 'pending'
+            },
+            { status: 'confirmed' },
+            { new: true }
+        )
 
         if (!booking) {
-            return res.status(404).json({
-                message: 'Booking not found'
+            const existingBooking = await Booking.findById(req.params.id).select('status hostel')
+            if (!existingBooking) return res.status(404).json({ message: 'Booking not found' })
+
+            const ownsBooking = ownerHostels.some(hostel => hostel._id.equals(existingBooking.hostel))
+            if (!ownsBooking) return res.status(403).json({ message: 'You are not authorized to manage this booking' })
+            return res.status(409).json({
+                message: `Booking cannot be confirmed because it is already ${existingBooking.status}`
             })
         }
-
-        const hostel = await Hostel.findOne({
-            _id: booking.hostel,
-            owner: req.user.id
-        })
-
-        if (!hostel) {
-            return res.status(403).json({
-                message: 'You are not authorized to manage this booking'
-            })
-        }
-
-        if (booking.status !== 'pending') {
-            return res.status(400).json({
-                message: `Booking cannot be confirmed because it is already ${booking.status}`
-            })
-        }
-
-        booking.status = 'confirmed'
-        await booking.save()
 
         return res.status(200).json({
             message: 'Booking confirmed successfully',
@@ -288,6 +297,10 @@ async function confirmBooking(req, res) {
 }
 
 async function cancelBooking(req, res) {
+    if (!isValidObjectId(req.params.id)) {
+        return res.status(400).json({ message: 'Invalid booking ID' })
+    }
+
     const session = await mongoose.startSession()
 
     try {
@@ -302,27 +315,18 @@ async function cancelBooking(req, res) {
                 throw error
             }
 
-            const hostel = await Hostel.findOne({
-                _id: booking.hostel,
-                owner: req.user.id
-            }).session(session)
+            const isOwner = await Hostel.exists({ _id: booking.hostel, owner: req.user.id }).session(session)
+            const isUser = booking.user.equals(req.user.id)
 
-            if (!hostel) {
-                const error = new Error('You are not authorized to manage this booking')
-                error.statusCode = 403
-                throw error
-            }
+            if (!isOwner && !isUser) throw createError('You are not authorized to cancel this booking', 403)
 
             if (booking.status !== 'pending') {
-                const error = new Error(`Booking cannot be cancelled because it is already ${booking.status}`)
-                error.statusCode = 400
-                throw error
+                throw createError(`Booking cannot be cancelled because it is already ${booking.status}`, 400)
             }
 
             const updatedBooking = await Booking.findOneAndUpdate(
                 {
                     _id: booking._id,
-                    hostel: hostel._id,
                     status: 'pending'
                 },
                 { status: 'cancelled' },
@@ -330,9 +334,7 @@ async function cancelBooking(req, res) {
             )
 
             if (!updatedBooking) {
-                const error = new Error('Booking could not be cancelled')
-                error.statusCode = 400
-                throw error
+                throw createError('Booking could not be cancelled', 409)
             }
 
             booking = updatedBooking
@@ -354,11 +356,60 @@ async function cancelBooking(req, res) {
     }
 }
 
+async function checkInBooking(req, res) {
+    return updateBookingStatus(req, res, 'confirmed', 'checkedIn', 'checked in')
+}
+
+async function completeBooking(req, res) {
+    return updateBookingStatus(req, res, 'checkedIn', 'completed', 'completed')
+}
+
+async function updateBookingStatus(req, res, currentStatus, nextStatus, label) {
+    if (!isValidObjectId(req.params.id)) {
+        return res.status(400).json({ message: 'Invalid booking ID' })
+    }
+
+    try {
+        const ownerHostels = await Hostel.find({ owner: req.user.id }).select('_id')
+        const booking = await Booking.findOneAndUpdate(
+            {
+                _id: req.params.id,
+                hostel: { $in: ownerHostels.map(hostel => hostel._id) },
+                status: currentStatus
+            },
+            { status: nextStatus },
+            { new: true }
+        )
+
+        if (!booking) {
+            const existingBooking = await Booking.findById(req.params.id).select('status hostel')
+            if (!existingBooking) return res.status(404).json({ message: 'Booking not found' })
+
+            const ownsBooking = ownerHostels.some(hostel => hostel._id.equals(existingBooking.hostel))
+            if (!ownsBooking) return res.status(403).json({ message: 'You are not authorized to manage this booking' })
+            return res.status(409).json({
+                message: `Booking must be ${currentStatus} before it can be ${label}`
+            })
+        }
+
+        return res.status(200).json({
+            message: `Booking ${label} successfully`,
+            data: { booking }
+        })
+    } catch (err) {
+        return res.status(400).json({
+            message: err.message || `Unable to mark booking as ${nextStatus}`
+        })
+    }
+}
+
 module.exports = {
     createBooking,
     getMyBookings,
     getBookingById,
     getOwnerPendingBookings,
     confirmBooking,
-    cancelBooking
+    cancelBooking,
+    checkInBooking,
+    completeBooking
 }

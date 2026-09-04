@@ -11,6 +11,16 @@ const ReviewSchema = mongoose.Schema({
         ref: 'User',
         required: true
     },
+    room: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Room',
+        required: true
+    },
+    booking: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Booking',
+        required: true
+    },
     rating: {
         type: Number,
         required: true,
@@ -45,13 +55,13 @@ const ReviewSchema = mongoose.Schema({
     comment: {
         type: String,
         trim: true
-    },
-    createdAt: {
-        type: Date,
-        default: Date.now
     }
+}, {
+    timestamps: true
 })
 
-const Review = mongoose.model('Review', ReviewSchema);
+ReviewSchema.index({ booking: 1 }, { unique: true })
 
-module.exports = Review;
+const Review = mongoose.model('Review', ReviewSchema)
+
+module.exports = Review

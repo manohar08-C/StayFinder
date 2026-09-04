@@ -142,7 +142,7 @@ async function hostelSearchServices(query) {
     if (sort === 'newest') {
         sortOption = { createdAt: -1 }
     } else if (sort === 'rating_desc') {
-        sortOption = { rating: -1, createdAt: -1 }
+        sortOption = { 'rating.average': -1, createdAt: -1 }
     }
 
     const hostels = await Hostel.find(filters)
@@ -204,7 +204,7 @@ function buildHostelMatch(query) {
     if (rating) {
         const parsedRating = Number(rating)
         if (!Number.isNaN(parsedRating)) {
-            hostelMatch.rating = { $gte: parsedRating }
+            hostelMatch['rating.average'] = { $gte: parsedRating }
         }
     }
 
@@ -222,7 +222,7 @@ function getPriceField(priceType = 'daily') {
 function buildUnifiedSortStage({ sort, geo }) {
     if (sort === 'price_asc') return { startingPrice: 1 }
     if (sort === 'price_desc') return { startingPrice: -1 }
-    if (sort === 'rating_desc') return { rating: -1, createdAt: -1 }
+    if (sort === 'rating_desc') return { 'rating.average': -1, createdAt: -1 }
     if (sort === 'newest') return { createdAt: -1 }
     if (sort === 'distance' || geo) return { distance: 1 }
     return { createdAt: -1 }
