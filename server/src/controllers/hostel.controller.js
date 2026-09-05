@@ -1,5 +1,6 @@
 const Hostel = require('../models/Hostel')
 const Room = require('../models/Room')
+const Booking = require('../models/Booking')
 const { hostelSearchServices } = require('../services/hostelSearch.services')
 // const { searchHostelsNearby } = require('../services/geoHostelSearch.services')
 
@@ -51,22 +52,6 @@ async function getHostels(req, res){
 }
 
 
-// async function getNearbyHostels(req, res) {
-//     try {
-//         const hostels = await searchHostelsNearby(req.query)
-
-//         return res.status(200).json({
-//             message: 'Nearby hostels fetched successfully',
-//             data: {
-//                 hostels
-//             }
-//         })
-//     } catch (err) {
-//         return res.status(400).json({
-//             message: err.message || 'Unable to fetch nearby hostels'
-//         })
-//     }
-// }
 
 async function getHostelById(req, res){
     try{
@@ -161,16 +146,30 @@ async function updateHostel(req, res){
 
 async function deleteHostel(req, res){
     try{
-        const hostel = await Hostel.findOneAndDelete(
-            {
-                _id: req.params.id,
-                owner: req.user.id
-            }
-        )
+        const hostel = await Hostel.findOne({
+            _id: req.params.id,
+            owner: req.user.id
+        })
 
         if (!hostel){
             return res.status(404).json({ message: 'Hostel not found' })
         }
+
+        const [roomExists, bookingExists] = await Promise.all([
+            Room.exists({ hostel: hostel._id }),
+            Booking.exists({
+                hostel: hostel._id,
+                status: { $ne: 'cancelled' }
+            })
+        ])
+
+        if (roomExists || bookingExists) {
+            return res.status(400).json({
+                message: 'Cannot delete a hostel with rooms or non-cancelled bookings'
+            })
+        }
+
+        await Hostel.deleteOne({ _id: hostel._id })
 
         return res.status(200).json({
             message: 'Hostel Deleted successfully',

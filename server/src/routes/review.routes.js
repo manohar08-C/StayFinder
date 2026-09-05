@@ -10,13 +10,13 @@ const {
 	deleteReview
 } = require('../controllers/review.controller')
 
-ReviewRoute.post('/reviews', tokenVerify, authorizeRoles('User'), createReview)
+ReviewRoute.post('/reviews', tokenVerify, authorizeRoles('User', 'hostelOwner'), createReview)
 
 ReviewRoute.get('/reviews/hostel/:hostelId', getHostelReviews)
 
-ReviewRoute.put('/reviews/:reviewId', tokenVerify, authorizeRoles('User'), updateReview)
+ReviewRoute.put('/reviews/:reviewId', tokenVerify, authorizeRoles('User', 'hostelOwner'), updateReview)
 
-ReviewRoute.delete('/reviews/:reviewId', tokenVerify, authorizeRoles('User'), deleteReview)
+ReviewRoute.delete('/reviews/:reviewId', tokenVerify, authorizeRoles('User', 'hostelOwner'), deleteReview)
 
 
 module.exports = { ReviewRoute }

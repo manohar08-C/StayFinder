@@ -136,7 +136,8 @@ async function updateRoom(req, res){
                 {
                     $match: {
                         room: room._id,
-                        status: { $ne: 'cancelled' }
+                        status: { $in: ['pending', 'confirmed', 'checkedIn'] },
+                        checkOut: { $gt: new Date() }
                     }
                 },
                 {

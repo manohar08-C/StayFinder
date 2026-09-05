@@ -1,11 +1,15 @@
 const jwt = require('jsonwebtoken')
 
-const jwtSecret = process.env.JWT_SECRET || 'mySecretKey'
+const jwtSecret = process.env.JWT_SECRET
+
+if (!jwtSecret) {
+    throw new Error('JWT_SECRET is not configured')
+}
 
 function tokenVerify(req, res, next) {
     const authorization = req.get('Authorization')
 
-    if (!authorization || !authorization.startsWith('Bearer')) {
+    if (!authorization || !authorization.startsWith('Bearer ')) {
         return res.status(401).json({
             message: 'Token required'
         })

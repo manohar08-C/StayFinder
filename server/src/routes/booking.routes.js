@@ -13,13 +13,13 @@ const {
     completeBooking
 } = require('../controllers/booking.controller')
 
-BookingRoute.post('/bookings', tokenVerify, authorizeRoles('User'), createBooking)
+BookingRoute.post('/bookings', tokenVerify, authorizeRoles('User', 'hostelOwner'), createBooking)
 
-BookingRoute.get('/bookings/my', tokenVerify, authorizeRoles('User'), getMyBookings)
+BookingRoute.get('/bookings/my', tokenVerify, authorizeRoles('User', 'hostelOwner'), getMyBookings)
 
 BookingRoute.get('/bookings/owner', tokenVerify, authorizeRoles('hostelOwner'), getOwnerPendingBookings)
 
-BookingRoute.get('/bookings/:id', tokenVerify, authorizeRoles('User'), getBookingById)
+BookingRoute.get('/bookings/:id', tokenVerify, authorizeRoles('User', 'hostelOwner'), getBookingById)
 
 BookingRoute.put('/bookings/:id/confirm', tokenVerify, authorizeRoles('hostelOwner'), confirmBooking)
 

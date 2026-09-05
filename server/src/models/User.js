@@ -28,6 +28,14 @@ const UserSchema = new mongoose.Schema({
         enum: ['User', 'hostelOwner', 'Admin'],
         default: 'User',
         required: true
+    },
+    resetPasswordToken: {
+        type: String,
+        select: false
+    },
+    resetPasswordExpires: {
+        type: Date,
+        select: false
     }
 }, { timestamps: true })
 
