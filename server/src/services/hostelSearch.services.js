@@ -113,6 +113,12 @@ async function hostelSearchServices(query) {
         const total = totalResult[0]?.total || 0
         const totalPages = Math.ceil(total / limitNumber)
 
+        const roomPricingMap = await buildRoomPricingMap(
+            hostels.map(hostel => hostel._id.toString()),
+            roomFilter,
+            availability
+        )
+
         const hostelsWithPrice = hostels.map(hostel => ({
             ...hostel,
             distance: typeof hostel.distance === 'number'
@@ -120,7 +126,7 @@ async function hostelSearchServices(query) {
                 : hostel.distance != null
                     ? Number(Number(hostel.distance).toFixed(2))
                     : null,
-            startingPrice: hostel.startingPrice ?? null
+            roomPricing: roomPricingMap.get(hostel._id.toString()) ?? null
         }))
 
         return {
@@ -151,11 +157,11 @@ async function hostelSearchServices(query) {
         .limit(limitNumber)
 
     const hostelIds = hostels.map(hostel => hostel._id.toString())
-    const startingPriceMap = await buildStartingPriceMap(hostelIds, roomFilter, priceType, availability)
+    const roomPricingMap = await buildRoomPricingMap(hostelIds, roomFilter, availability)
 
     const hostelsWithPrice = hostels.map(hostel => ({
         ...hostel.toObject(),
-        startingPrice: startingPriceMap.get(hostel._id.toString()) ?? null
+        roomPricing: roomPricingMap.get(hostel._id.toString()) ?? null
     }))
 
     const totalPages = Math.ceil(total / limitNumber)
@@ -471,6 +477,32 @@ async function buildStartingPriceMap(hostelIds, roomFilter = {}, priceType = 'da
     return new Map(prices.map(item => [item._id.toString(), item.startingPrice]))
 }
 
+async function buildRoomPricingMap(hostelIds, roomFilter = {}, availability) {
+    if (!hostelIds.length) return new Map()
+
+    const roomMatch = { hostel: { $in: hostelIds } }
+    if (Object.keys(roomFilter).length > 0) {
+        Object.assign(roomMatch, roomFilter)
+    }
+
+    const prices = await Room.aggregate([
+        { $match: roomMatch },
+        ...buildRoomAvailabilityStages(availability),
+        {
+            $group: {
+                _id: '$hostel',
+                daily: { $min: '$pricing.daily' },
+                monthly: { $min: '$pricing.monthly' }
+            }
+        }
+    ])
+
+    return new Map(prices.map(item => [item._id.toString(), {
+        daily: item.daily ?? null,
+        monthly: item.monthly ?? null
+    }]))
+}
+
 function buildPriceSearchPipeline({ hostelMatch, roomMatch, skip, limitNumber, sort, priceType = 'daily', availability }) {
     const roomLookupPipeline = buildRoomLookupPipeline(roomMatch, availability)
 
@@ -569,6 +601,15 @@ async function searchHostelsByPrice({ page, limit, sort, priceType = 'daily', av
     })
 
     const hostels = await Hostel.aggregate(hostelPipeline)
+    const roomPricingMap = await buildRoomPricingMap(
+        hostels.map(hostel => hostel._id.toString()),
+        roomMatch,
+        availability
+    )
+    const hostelsWithPricing = hostels.map(hostel => ({
+        ...hostel,
+        roomPricing: roomPricingMap.get(hostel._id.toString()) ?? null
+    }))
     const total = await Hostel.aggregate(buildPriceSearchCountPipeline({
         hostelMatch,
         roomMatch,
@@ -580,7 +621,7 @@ async function searchHostelsByPrice({ page, limit, sort, priceType = 'daily', av
     const totalPages = Math.ceil(count / limitNumber)
 
     return {
-        hostels,
+        hostels: hostelsWithPricing,
         pagination: {
             total: count,
             page: pageNumber,
