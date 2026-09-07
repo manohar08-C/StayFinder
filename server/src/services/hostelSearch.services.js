@@ -1,6 +1,7 @@
 const Hostel = require('../models/Hostel')
 const Room = require('../models/Room')
 const Booking = require('../models/Booking')
+const mongoose = require('mongoose')
 
 const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
@@ -453,10 +454,22 @@ function buildRoomLookupPipeline(roomMatch = {}, availability) {
     return roomLookupPipeline
 }
 
-async function buildStartingPriceMap(hostelIds, roomFilter = {}, priceType = 'daily', availability) {
+async function buildStartingPriceMap(
+    hostelIds,
+    roomFilter = {},
+    priceType = 'daily',
+    availability
+) {
     if (!hostelIds.length) return new Map()
 
-    const roomMatch = { hostel: { $in: hostelIds } }
+    const objectHostelIds = hostelIds.map(
+        id => new mongoose.Types.ObjectId(id)
+    )
+
+    const roomMatch = {
+        hostel: { $in: objectHostelIds }
+    }
+
     if (Object.keys(roomFilter).length > 0) {
         Object.assign(roomMatch, roomFilter)
     }
@@ -469,18 +482,32 @@ async function buildStartingPriceMap(hostelIds, roomFilter = {}, priceType = 'da
         {
             $group: {
                 _id: '$hostel',
-                startingPrice: { $min: `$${priceField}` }
+                startingPrice: {
+                    $min: `$${priceField}`
+                }
             }
         }
     ])
 
-    return new Map(prices.map(item => [item._id.toString(), item.startingPrice]))
+    return new Map(
+        prices.map(item => [
+            item._id.toString(),
+            item.startingPrice
+        ])
+    )
 }
 
 async function buildRoomPricingMap(hostelIds, roomFilter = {}, availability) {
     if (!hostelIds.length) return new Map()
 
-    const roomMatch = { hostel: { $in: hostelIds } }
+    const objectHostelIds = hostelIds.map(
+        id => new mongoose.Types.ObjectId(id)
+    )
+
+    const roomMatch = {
+        hostel: { $in: objectHostelIds }
+    }
+
     if (Object.keys(roomFilter).length > 0) {
         Object.assign(roomMatch, roomFilter)
     }
@@ -497,10 +524,15 @@ async function buildRoomPricingMap(hostelIds, roomFilter = {}, availability) {
         }
     ])
 
-    return new Map(prices.map(item => [item._id.toString(), {
-        daily: item.daily ?? null,
-        monthly: item.monthly ?? null
-    }]))
+    return new Map(
+        prices.map(item => [
+            item._id.toString(),
+            {
+                daily: item.daily ?? null,
+                monthly: item.monthly ?? null
+            }
+        ])
+    )
 }
 
 function buildPriceSearchPipeline({ hostelMatch, roomMatch, skip, limitNumber, sort, priceType = 'daily', availability }) {

@@ -47,6 +47,7 @@ async function getHostels(req, res){
             pagination: result.pagination
         })
     } catch (err) {
+        console.error('Unable to fetch hostels:', err)
         return res.status(500).json({ message: 'Unable to fetch hostels' })
     }
 }
