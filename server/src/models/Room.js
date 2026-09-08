@@ -39,7 +39,14 @@ const RoomSchema = mongoose.Schema({
         min: 0
     },
     amenities: [String],
-    images: [String]
+    images: {
+        type: [String],
+        required: true,
+        validate: {
+            validator: value => Array.isArray(value) && value.length > 0 && value.every(item => typeof item === 'string' && item.trim().length > 0),
+            message: 'At least one valid room image URL is required'
+        }
+    }
 })
 
 const Room = mongoose.model('Room', RoomSchema);

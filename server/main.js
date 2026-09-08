@@ -2,6 +2,7 @@ const express = require('express')
 const cors = require('cors')
 const mongoose = require('mongoose')
 const dotenv = require('dotenv')
+const path = require('path')
 dotenv.config()
 const app = express()
 
@@ -20,6 +21,7 @@ const { OwnerRouter } = require('./src/routes/owner.routes')
 
 app.use(cors())
 app.use(express.json())
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 
 mongoose.connect(process.env.Database_URL)
     .then(() => console.log('the database is connected'))

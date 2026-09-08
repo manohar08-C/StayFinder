@@ -1,10 +1,25 @@
 const Hostel = require('../models/Hostel')
 const Room = require('../models/Room')
 const Booking = require('../models/Booking')
+const { uploadedImageUrls } = require('../middleware/upload.middleware')
 
 async function createRoom(req, res) {
     try {
-        const { roomType, pricing, capacity, area, amenities, images } = req.body
+        const { roomType, capacity, area, amenities, imageUrls } = req.body
+        const pricing = typeof req.body.pricing === 'string'
+            ? JSON.parse(req.body.pricing)
+            : req.body.pricing
+
+        const existingImages = Array.isArray(imageUrls)
+            ? imageUrls
+            : typeof imageUrls === 'string'
+                ? imageUrls.split(/[\n,]/).map(url => url.trim()).filter(Boolean)
+                : []
+        const parsedImages = [...existingImages, ...uploadedImageUrls(req)]
+
+        if (!parsedImages.length) {
+            return res.status(400).json({ message: 'At least one room image URL is required' })
+        }
 
         const hostel = await Hostel.findOne({
             _id: req.params.id,
@@ -22,7 +37,7 @@ async function createRoom(req, res) {
             capacity,
             area,
             amenities,
-            images
+            images: parsedImages
         })
 
         return res.status(201).json({
@@ -93,7 +108,23 @@ async function getRoomById(req, res) {
 
 async function updateRoom(req, res){
     try{
-        const { roomType, pricing, capacity, area, amenities, images } = req.body
+        const { roomType, capacity, area, amenities, imageUrls } = req.body
+        const pricing = typeof req.body.pricing === 'string'
+            ? JSON.parse(req.body.pricing)
+            : req.body.pricing
+
+        const existingImages = Array.isArray(imageUrls)
+            ? imageUrls
+            : typeof imageUrls === 'string'
+                ? imageUrls.split(/[\n,]/).map(url => url.trim()).filter(Boolean)
+                : []
+        const parsedImages = [...existingImages, ...uploadedImageUrls(req)]
+
+        if (imageUrls !== undefined && !parsedImages.length) {
+            return res.status(400).json({
+                message: 'At least one room image URL is required when updating images'
+            })
+        }
 
         if (
             pricing !== undefined &&
@@ -113,7 +144,7 @@ async function updateRoom(req, res){
             capacity,
             area,
             amenities,
-            images
+            images: parsedImages.length ? parsedImages : undefined
         }
 
         const room = await Room.findById(req.params.id)

@@ -38,19 +38,25 @@ const HostelSchema = mongoose.Schema({
     location: {
         type: {
             type: String,
-            enum: ['Point'],
-            default: 'Point'
+            enum: ['Point']
         },
         coordinates: {
             type: [Number],
             validate: {
-                validator: coordinates => coordinates.length === 2,
+                validator: coordinates => !coordinates || coordinates.length === 2,
                 message: 'Location coordinates must contain longitude and latitude'
             }
         }
     },
     amenities: [String],
-    images: [String],
+    images: {
+        type: [String],
+        required: true,
+        validate: {
+            validator: value => Array.isArray(value) && value.length > 0 && value.every(item => typeof item === 'string' && item.trim().length > 0),
+            message: 'At least one valid hostel image URL is required'
+        }
+    },
     videos: [String],
     food: {
         type: String,

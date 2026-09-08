@@ -1,10 +1,11 @@
 const express = require('express')
 const { hostel, getHostels, getHostelById, getMyHostels, updateHostel, deleteHostel } = require('../controllers/hostel.controller')
 const { tokenVerify, authorizeRoles } = require('../middleware/auth.middleware')
+const { imageUpload, handleUploadError } = require('../middleware/upload.middleware')
 
 const HostelRouter = express.Router()
 
-HostelRouter.post('/hostels', tokenVerify, authorizeRoles('hostelOwner'), hostel)
+HostelRouter.post('/hostels', tokenVerify, authorizeRoles('hostelOwner'), imageUpload.array('images', 10), handleUploadError, hostel)
 
 HostelRouter.get('/hostels', getHostels)
 
@@ -14,7 +15,7 @@ HostelRouter.get('/hostels/my', tokenVerify, authorizeRoles('hostelOwner'), getM
 
 HostelRouter.get('/hostels/:id', getHostelById)
 
-HostelRouter.put('/hostels/:id', tokenVerify, authorizeRoles('hostelOwner'), updateHostel)
+HostelRouter.put('/hostels/:id', tokenVerify, authorizeRoles('hostelOwner'), imageUpload.array('images', 10), handleUploadError, updateHostel)
 
 HostelRouter.delete('/hostels/:id', tokenVerify, authorizeRoles('hostelOwner'), deleteHostel)
 
