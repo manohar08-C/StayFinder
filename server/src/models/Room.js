@@ -1,0 +1,54 @@
+const mongoose = require('mongoose')
+
+const RoomSchema = mongoose.Schema({
+    hostel: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Hostel',
+        required: true
+    },
+    roomType: {
+        type: String,
+        required: true,
+        trim: true
+    },
+    pricing: {
+        daily: {
+            type: Number,
+            required: true,
+            min: 0
+        },
+        monthly: {
+            type: Number,
+            required: true,
+            min: 0
+        }
+    },
+    capacity: {
+        type: Number,
+        required: true,
+        min: 1
+    },
+    availabilityVersion: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 0
+    },
+    area: {
+        type: Number,
+        min: 0
+    },
+    amenities: [String],
+    images: {
+        type: [String],
+        required: true,
+        validate: {
+            validator: value => Array.isArray(value) && value.length > 0 && value.every(item => typeof item === 'string' && item.trim().length > 0),
+            message: 'At least one valid room image URL is required'
+        }
+    }
+})
+
+const Room = mongoose.model('Room', RoomSchema);
+
+module.exports = Room;
